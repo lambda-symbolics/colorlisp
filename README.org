@@ -32,3 +32,5 @@ Run the complete check with:
 ColorLisp is licensed under the ISC license. Vendored components retain their
 own licenses in =vendor/licenses/= and their exact revisions are recorded in
 =vendor/README.org=.
+
+Part of the [[https://www.lambda-symbolics.com/libraries][Lambda Symbolics library shelf]].
