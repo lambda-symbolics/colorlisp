@@ -29,6 +29,6 @@ Run the complete check with:
 ./script/check
 #+end_src
 
-ColorLisp is licensed under the MIT license. Vendored components retain their
+ColorLisp is licensed under the ISC license. Vendored components retain their
 own licenses in =vendor/licenses/= and their exact revisions are recorded in
 =vendor/README.org=.

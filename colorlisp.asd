@@ -1,7 +1,7 @@
 (asdf:defsystem "colorlisp"
   :description "Style-neutral syntax highlighting for Common Lisp applications"
   :author "ColorLisp contributors"
-  :license "MIT"
+  :license "ISC"
   :version "0.2.0"
   :depends-on ("babel"
                "cffi"
