@@ -136,9 +136,15 @@
                     (get-universal-time)
                     (random most-positive-fixnum))
             (uiop:pathname-directory-pathname target)))
+         ;; Windows toolchains reject -fPIC, and ship no cc, so clang is
+         ;; the default compiler there.
          (command
-           (append (list (or (uiop:getenv "CC") "cc")
-                         "-shared" "-fPIC" "-O2" "-std=gnu11"
+           (append (list (or (uiop:getenv "CC")
+                             (if (uiop:os-windows-p) "clang" "cc"))
+                         "-shared")
+                   (unless (uiop:os-windows-p)
+                     (list "-fPIC"))
+                   (list "-O2" "-std=gnu11"
                          "-fvisibility=hidden"
                          "-o" (namestring temporary))
                    (colorlisp--native-include-arguments)
