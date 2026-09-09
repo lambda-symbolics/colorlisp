@@ -5,7 +5,9 @@
 
 #include "tree_sitter/api.h"
 
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(_WIN32)
+#define COLORLISP_PUBLIC __declspec(dllexport)
+#elif defined(__GNUC__) || defined(__clang__)
 #define COLORLISP_PUBLIC __attribute__((visibility("default")))
 #else
 #define COLORLISP_PUBLIC
