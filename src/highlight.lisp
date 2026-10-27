@@ -1,6 +1,5 @@
 (in-package #:colorlisp)
 
-
 (defstruct (span
             (:constructor span--create (start end category capture pattern)))
   "A semantic highlight over character offsets START through END."
@@ -10,7 +9,6 @@
   (capture "" :type string :read-only t)
   (pattern 0 :type fixnum :read-only t))
 
-
 (defstruct (segment
             (:constructor segment--create (start end category text)))
   "A complete source segment with a semantic CATEGORY and TEXT."
@@ -18,7 +16,6 @@
   (end 0 :type fixnum :read-only t)
   (category :plain :type keyword :read-only t)
   (text "" :type string :read-only t))
-
 
 (defstruct (raw-capture
             (:constructor raw-capture--create
@@ -30,10 +27,8 @@
   (capture-name "" :type string)
   (pattern 0 :type fixnum))
 
-
 (defvar *query-cache* (make-hash-table :test #'equal)
   "Highlight query text cached by relative pathname.")
-
 
 (defun colorlisp--query-source (relative-pathname)
   "Read and cache a bundled query at RELATIVE-PATHNAME."
@@ -43,12 +38,11 @@
              (merge-pathnames relative-pathname
                               (colorlisp--source-root))))))
 
-
 (defun colorlisp--utf-8-byte-map (source)
   "Return a vector mapping UTF-8 boundary offsets in SOURCE to character offsets."
   (let* ((octet-count (length (babel:string-to-octets source :encoding :utf-8)))
          (mapping     (make-array (1+ octet-count)
-                                  :element-type 'fixnum
+                                  :element-type    'fixnum
                                   :initial-element -1))
          (byte        0))
     (loop for character across source
@@ -57,13 +51,16 @@
           do (setf (aref mapping byte) character-index)
              (incf byte
                    (cond
-                     ((<= code #x7f) 1)
-                     ((<= code #x7ff) 2)
-                     ((<= code #xffff) 3)
-                     (t 4))))
+                     ((<= code #x7f)
+                      1)
+                     ((<= code #x7ff)
+                      2)
+                     ((<= code #xffff)
+                      3)
+                     (t
+                      4))))
     (setf (aref mapping byte) (length source))
     mapping))
-
 
 (defun colorlisp--capture-name (session capture-id)
   "Return CAPTURE-ID's query capture name in SESSION."
@@ -71,13 +68,11 @@
     (let ((pointer (colorlisp--session-capture-name session capture-id length)))
       (colorlisp--foreign-string pointer (cffi:mem-ref length :uint32)))))
 
-
 (defun colorlisp--query-string (session string-id)
   "Return STRING-ID's query string in SESSION."
   (cffi:with-foreign-object (length :uint32)
     (let ((pointer (colorlisp--session-string-value session string-id length)))
       (colorlisp--foreign-string pointer (cffi:mem-ref length :uint32)))))
-
 
 (defun colorlisp--current-match-captures (session pattern capture-count)
   "Copy the current native match's CAPTURE-COUNT captures."
@@ -98,7 +93,6 @@
              (colorlisp--capture-name session id)
              pattern)))))
 
-
 (defun colorlisp--predicate-steps (session pattern)
   "Return PATTERN's predicate steps as Lisp operands."
   (let ((count (colorlisp--session-predicate-step-count session pattern)))
@@ -113,20 +107,22 @@
             (let ((type  (cffi:mem-ref step-type :uint32))
                   (value (cffi:mem-ref value-id :uint32)))
               (case type
-                (0 :done)
-                (1 (list :capture value))
-                (2 (list :string (colorlisp--query-string session value)))
+                (0
+                 :done)
+                (1
+                 (list :capture value))
+                (2
+                 (list :string (colorlisp--query-string session value)))
                 (otherwise
                  (error 'highlight-error
                         :detail (format nil
                                         "Unknown Tree-sitter predicate step ~D."
                                         type)))))))))
 
-
 (defun colorlisp--split-predicates (steps)
   "Split query predicate STEPS at :DONE markers."
   (let ((predicates nil)
-        (current nil))
+        (current    nil))
     (dolist (step steps)
       (if (eq step :done)
           (when current
@@ -137,7 +133,6 @@
       (push (nreverse current) predicates))
     (nreverse predicates)))
 
-
 (defun colorlisp--capture-text (capture source byte-map)
   "Return CAPTURE's text from SOURCE using BYTE-MAP."
   (let ((start (aref byte-map (raw-capture-start-byte capture)))
@@ -147,13 +142,11 @@
              :detail "A Tree-sitter capture did not end on UTF-8 boundaries."))
     (subseq source start end)))
 
-
 (defun colorlisp--capture-values (capture-id captures &key source byte-map)
   "Return texts captured under CAPTURE-ID in the current match."
   (loop for capture in captures
         when (= capture-id (raw-capture-capture-id capture))
           collect (colorlisp--capture-text capture source byte-map)))
-
 
 (defun colorlisp--operand-values (operand captures &key source byte-map)
   "Resolve a query predicate OPERAND into one or more strings."
@@ -165,7 +158,6 @@
                                 :source   source
                                 :byte-map byte-map))))
 
-
 (defun colorlisp--predicate-name (operand)
   "Normalize the leading operator OPERAND of a query predicate."
   (let ((name (second operand)))
@@ -174,14 +166,12 @@
          (subseq name 1)
          name))))
 
-
 (defun colorlisp--predicate-match-p (values pattern any-p)
   "Test VALUES against PATTERN, using existential semantics when ANY-P."
   (funcall (if any-p #'some #'every)
            (lambda (value)
              (not (null (cl-ppcre:scan pattern value))))
            values))
-
 
 (defun colorlisp--predicate-equal-p (left right any-p)
   "Compare LEFT and RIGHT strings, using existential semantics when ANY-P."
@@ -190,7 +180,6 @@
                 append (loop for right-value in right
                              collect (string= left-value right-value)))))
     (funcall (if any-p #'some #'every) #'identity comparisons)))
-
 
 (defun colorlisp--predicate-satisfied-p (predicate captures &key source byte-map)
   "Return true when PREDICATE accepts the current match."
@@ -244,7 +233,6 @@
        (error 'highlight-error
               :detail (format nil "Unsupported query predicate ~A." name))))))
 
-
 (defun colorlisp--match-satisfied-p (session pattern captures &key source byte-map)
   "Return true when every predicate for PATTERN accepts CAPTURES."
   (every (lambda (predicate)
@@ -254,12 +242,11 @@
          (colorlisp--split-predicates
           (colorlisp--predicate-steps session pattern))))
 
-
 (defun colorlisp--layer-captures (grammar query &key source source-octets byte-map)
   "Return accepted raw captures for one GRAMMAR and QUERY layer."
   (let* ((query-source (colorlisp--query-source query))
          (query-octets (babel:string-to-octets query-source :encoding :utf-8))
-         (result nil))
+         (result       nil))
     (with-colorlisp-session (session grammar source-octets query-octets)
       (cffi:with-foreign-objects ((pattern :uint32)
                                   (capture-count :uint32))
@@ -275,53 +262,72 @@
                 do (setf result (nconc result captures)))))
     result))
 
-
 (defun colorlisp--capture-category (capture-name)
   "Map a Tree-sitter CAPTURE-NAME to a stable semantic category."
   (let ((name (string-downcase capture-name)))
     (cond
-      ((string= name "none") :plain)
-      ((or (search "comment" name) (string= name "spell")) :comment)
-      ((search "escape" name) :escape)
+      ((string= name "none")
+       :plain)
+      ((or (search "comment" name) (string= name "spell"))
+       :comment)
+      ((search "escape" name)
+       :escape)
       ((or (search "string" name)
            (search "character" name)
            (string= name "text.literal"))
        :string)
-      ((search "keyword" name) :keyword)
-      ((search "operator" name) :operator)
-      ((search "punctuation" name) :punctuation)
+      ((search "keyword" name)
+       :keyword)
+      ((search "operator" name)
+       :operator)
+      ((search "punctuation" name)
+       :punctuation)
       ((or (search "number" name)
            (search "numeric" name)
            (search "float" name))
        :number)
-      ((or (search "constant" name) (search "boolean" name)) :constant)
-      ((or (search "type" name) (search "constructor" name)) :type)
-      ((search "macro" name) :macro)
-      ((search "method" name) :method)
-      ((search "function" name) :function)
-      ((search "parameter" name) :parameter)
+      ((or (search "constant" name) (search "boolean" name))
+       :constant)
+      ((or (search "type" name) (search "constructor" name))
+       :type)
+      ((search "macro" name)
+       :macro)
+      ((search "method" name)
+       :method)
+      ((search "function" name)
+       :function)
+      ((search "parameter" name)
+       :parameter)
       ((or (search "property" name)
            (search "field" name)
            (search "member" name))
        :property)
-      ((search "variable.builtin" name) :builtin)
-      ((search "variable" name) :variable)
-      ((or (search "module" name) (search "namespace" name)) :namespace)
-      ((search "label" name) :label)
-      ((or (search "attribute" name) (search "tag" name)) :attribute)
-      ((search "title" name) :heading)
-      ((or (search "uri" name) (search "reference" name)) :link)
-      ((search "embedded" name) :embedded)
-      ((search "special" name) :special)
-      (t :plain))))
-
+      ((search "variable.builtin" name)
+       :builtin)
+      ((search "variable" name)
+       :variable)
+      ((or (search "module" name) (search "namespace" name))
+       :namespace)
+      ((search "label" name)
+       :label)
+      ((or (search "attribute" name) (search "tag" name))
+       :attribute)
+      ((search "title" name)
+       :heading)
+      ((or (search "uri" name) (search "reference" name))
+       :link)
+      ((search "embedded" name)
+       :embedded)
+      ((search "special" name)
+       :special)
+      (t
+       :plain))))
 
 (defun colorlisp--auxiliary-capture-p (capture)
   "Return true when CAPTURE only supports a query predicate."
   (let ((name (raw-capture-capture-name capture)))
     (and (plusp (length name))
          (char= #\_ (char name 0)))))
-
 
 (defun colorlisp--capture->span (capture byte-map)
   "Convert a raw CAPTURE into a character-offset span using BYTE-MAP."
@@ -336,7 +342,6 @@
                   (raw-capture-capture-name capture)
                   (raw-capture-pattern capture))))
 
-
 (defun colorlisp--span-less-specific-p (left right)
   "Order spans so more specific and later patterns overwrite LEFT first."
   (let ((left-length  (- (span-end left) (span-start left)))
@@ -344,7 +349,6 @@
     (if (= left-length right-length)
         (< (span-pattern left) (span-pattern right))
         (> left-length right-length))))
-
 
 (defun colorlisp--resolve-spans (source spans)
   "Resolve overlapping SPANS over SOURCE into non-overlapping semantic spans."
@@ -355,7 +359,7 @@
             do (setf (aref categories index) (span-category span)
                      (aref captures index) (span-capture span))))
     (let ((result nil)
-          (start 0))
+          (start  0))
       (labels ((emit (end)
                  (let ((category (aref categories start)))
                    (when category
@@ -373,7 +377,6 @@
           (emit (length source))))
       (nreverse result))))
 
-
 (defun colorlisp--resolve-language (language pathname source)
   "Resolve an explicit LANGUAGE or detect one from PATHNAME and SOURCE."
   (cond
@@ -383,7 +386,6 @@
      (language-detect pathname :source source))
     (t
      nil)))
-
 
 (defun highlight-spans (source &key language pathname)
   "Return non-overlapping semantic spans for SOURCE.
@@ -409,15 +411,14 @@ Offsets are Common Lisp character offsets, not UTF-8 byte offsets."
                unless (colorlisp--auxiliary-capture-p capture)
                  collect (colorlisp--capture->span capture byte-map)))))))
 
-
 (defun highlight-segments (source &key language pathname)
   "Return complete, ordered semantic segments covering SOURCE."
   (check-type source string)
   (if (zerop (length source))
       nil
-      (let ((spans (highlight-spans source
-                                    :language language
-                                    :pathname pathname))
+      (let ((spans    (highlight-spans source
+                                       :language language
+                                       :pathname pathname))
             (segments nil)
             (position 0))
         (dolist (span spans)

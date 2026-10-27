@@ -1,6 +1,5 @@
 (in-package #:colorlisp)
 
-
 (cffi:defcfun ("colorlisp_session_new" colorlisp--session-new) :pointer
   (language-name :string)
   (source :pointer)
@@ -53,7 +52,6 @@
   (string-id :uint32)
   (length :pointer))
 
-
 (defmacro with-colorlisp-session ((variable language-name source-octets
                                    query-octets)
                                   &body body)
@@ -76,34 +74,45 @@
              (when (cffi:null-pointer-p ,variable)
                (error 'query-error
                       :language ,language-name
-                      :offset (cffi:mem-ref error-offset :uint32)
-                      :type (colorlisp--query-error-name
-                             (cffi:mem-ref error-type :uint32))))
+                      :offset   (cffi:mem-ref error-offset :uint32)
+                      :type     (colorlisp--query-error-name
+                                 (cffi:mem-ref error-type :uint32))))
              (unwind-protect
                   (progn ,@body)
                (colorlisp--session-delete ,variable))))))))
 
-
 (defun colorlisp--foreign-string (pointer length)
   "Decode LENGTH UTF-8 bytes at POINTER into a Lisp string."
   (cffi:foreign-string-to-lisp pointer
-                               :count length
+                               :count    length
                                :encoding :utf-8))
-
 
 (defun colorlisp--query-error-name (value)
   "Return a readable name for a Tree-sitter query error VALUE."
   (case value
-    (0 :none)
-    (1 :syntax)
-    (2 :node-type)
-    (3 :field)
-    (4 :capture)
-    (5 :structure)
-    (6 :language)
-    (#.(1- (expt 2 32)) :unknown-language)
-    (#.(- (expt 2 32) 2) :allocation)
-    (#.(- (expt 2 32) 3) :incompatible-language)
-    (#.(- (expt 2 32) 4) :parse)
-    (#.(- (expt 2 32) 5) :cursor-allocation)
-    (otherwise value)))
+    (0
+     :none)
+    (1
+     :syntax)
+    (2
+     :node-type)
+    (3
+     :field)
+    (4
+     :capture)
+    (5
+     :structure)
+    (6
+     :language)
+    (#.(1- (expt 2 32))
+     :unknown-language)
+    (#.(- (expt 2 32) 2)
+     :allocation)
+    (#.(- (expt 2 32) 3)
+     :incompatible-language)
+    (#.(- (expt 2 32) 4)
+     :parse)
+    (#.(- (expt 2 32) 5)
+     :cursor-allocation)
+    (otherwise
+     value)))

@@ -5,23 +5,19 @@
 
 (in-package #:colorlisp/tests)
 
-
 (defvar *failures* nil
   "The failed checks of the current test run, most recent first.")
-
 
 (defmacro check (form &optional description)
   "Evaluate FORM and record DESCRIPTION, or FORM itself, as a failure when it returns false."
   `(unless ,form
      (push (or ,description ',form) *failures*)))
 
-
 (defun segments--categories (source language)
   "Return all non-plain categories produced for SOURCE in LANGUAGE."
   (remove :plain
           (mapcar #'colorlisp:segment-category
                   (colorlisp:highlight-segments source :language language))))
-
 
 (defun source--category-at (source language text)
   "Return the highlight category at the first occurrence of TEXT in SOURCE."
@@ -32,7 +28,6 @@
                          (< position (colorlisp:span-end span)))
                  return (colorlisp:span-category span)
                finally (return :plain)))))
-
 
 (defun test-language-registry ()
   "Test explicit aliases and pathname detection."
@@ -95,12 +90,10 @@ echo yes
   (check (null (colorlisp:language-detect "README"))
          "unknown pathname returns nil"))
 
-
 (defun test-native-library ()
   "Test that packagers can materialize and locate the native library."
   (check (probe-file (colorlisp:native-library-path))
          "native library pathname exists"))
-
 
 (defun test-native-include-arguments ()
   "Test that native builds use the vendored Tree-sitter runtime headers."
@@ -114,7 +107,6 @@ echo yes
                    (colorlisp::colorlisp--native-include-arguments)
                    :test #'string=)
            "native build includes vendored Tree-sitter source headers")))
-
 
 (defun test-supported-grammars ()
   "Smoke-test every bundled grammar and query."
@@ -179,7 +171,6 @@ end
         (push (format nil "highlight ~A signaled ~A" (first case) condition)
               *failures*)))))
 
-
 (defun test-new-language-semantics ()
   "Test useful semantic distinctions in the new language queries."
   (let ((source "(ns colorlisp.core)
@@ -208,7 +199,7 @@ letter = 'x'
            "Haskell character literal normalizes to string"))
   (let ((implementation "let greet name = String.length name
 ")
-        (interface "val greet : string -> int
+        (interface      "val greet : string -> int
 "))
     (check (eq :keyword
                (source--category-at implementation :ocaml "let"))
@@ -223,10 +214,9 @@ letter = 'x'
                (source--category-at interface :ocaml-interface "greet"))
            "OCaml interface function")))
 
-
 (defun test-semantic-output ()
   "Test semantic categories, complete coverage, and Unicode offsets."
-  (let* ((source "(defun λ-name (value) ; note
+  (let* ((source   "(defun λ-name (value) ; note
   (format t \"λ=~A\" value))")
          (segments (colorlisp:highlight-segments
                     source :language :common-lisp)))
@@ -248,7 +238,6 @@ letter = 'x'
     (check (eq :plain (colorlisp:segment-category (first segments)))
            "unknown source is plain")))
 
-
 (defun test-capture-normalization ()
   "Test normalization of grammar-specific capture names."
   (let ((categories
@@ -257,7 +246,6 @@ letter = 'x'
                    "fn main() { 42 }" :language :rust))))
     (check (member :number categories)
            "numeric constants normalize to the number category")))
-
 
 (defun run-tests ()
   "Run the complete ColorLisp test suite and return true on success."

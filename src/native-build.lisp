@@ -1,6 +1,5 @@
 (in-package #:colorlisp)
 
-
 (defparameter *native-cache-version*
   "0.2.0-ts-0.26.11-20260722"
   "Version key for native sources and vendored grammars.")
@@ -8,11 +7,9 @@
 (defvar *native-library* nil
   "CFFI handle for the loaded ColorLisp native library.")
 
-
 (defun colorlisp--source-root ()
   "Return the root of the loaded ColorLisp ASDF system."
   (asdf:system-source-directory "colorlisp"))
-
 
 (defun colorlisp--cache-root ()
   "Return ColorLisp's XDG-compatible cache directory."
@@ -23,18 +20,15 @@
          (uiop:ensure-directory-pathname xdg-cache-home)
          (merge-pathnames ".cache/" (user-homedir-pathname))))))
 
-
 (defun colorlisp--bundled-library-path ()
   "Return the optional prebuilt native library pathname."
   (merge-pathnames "native/libcolorlisp-tree-sitter.so"
                    (colorlisp--source-root)))
 
-
 (defun colorlisp--cached-library-path ()
   "Return the native library pathname in the user cache."
   (merge-pathnames "libcolorlisp-tree-sitter.so"
                    (colorlisp--cache-root)))
-
 
 (defun colorlisp--native-source-pathnames ()
   "Return every C translation unit needed by the native library."
@@ -90,7 +84,6 @@
        "vendor/grammars/lua/parser.c"
        "vendor/grammars/lua/scanner.c"))))
 
-
 (defun colorlisp--native-include-arguments ()
   "Return compiler include arguments for runtime and grammar headers."
   (let ((root (colorlisp--source-root)))
@@ -126,7 +119,6 @@
        "vendor/grammars/ruby/"
        "vendor/grammars/lua/"))))
 
-
 (defun colorlisp--build-native-library (target)
   "Build the native library and atomically publish it at TARGET."
   (ensure-directories-exist target)
@@ -152,14 +144,13 @@
     (handler-case
         (progn
           (uiop:run-program command
-                            :output *standard-output*
+                            :output       *standard-output*
                             :error-output *error-output*)
           (uiop:rename-file-overwriting-target temporary target))
       (error (condition)
         (when (probe-file temporary)
           (delete-file temporary))
         (error 'native-build-error :command command :cause condition)))))
-
 
 (defun colorlisp--native-library-path ()
   "Return an existing native library, building one when necessary."
@@ -181,11 +172,9 @@
        (colorlisp--build-native-library cached)
        cached))))
 
-
 (defun native-library-path ()
   "Build when needed and return ColorLisp's native library pathname."
   (colorlisp--native-library-path))
-
 
 (defun native-ensure-loaded ()
   "Build when needed and load ColorLisp's native Tree-sitter library."
