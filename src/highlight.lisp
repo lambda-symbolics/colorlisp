@@ -148,20 +148,22 @@
     (subseq source start end)))
 
 
-(defun colorlisp--capture-values (capture-id captures source byte-map)
+(defun colorlisp--capture-values (capture-id captures &key source byte-map)
   "Return texts captured under CAPTURE-ID in the current match."
   (loop for capture in captures
         when (= capture-id (raw-capture-capture-id capture))
           collect (colorlisp--capture-text capture source byte-map)))
 
 
-(defun colorlisp--operand-values (operand captures source byte-map)
+(defun colorlisp--operand-values (operand captures &key source byte-map)
   "Resolve a query predicate OPERAND into one or more strings."
   (ecase (first operand)
     (:string
      (list (second operand)))
     (:capture
-     (colorlisp--capture-values (second operand) captures source byte-map))))
+     (colorlisp--capture-values (second operand) captures
+                                :source   source
+                                :byte-map byte-map))))
 
 
 (defun colorlisp--predicate-name (operand)
@@ -190,13 +192,14 @@
     (funcall (if any-p #'some #'every) #'identity comparisons)))
 
 
-(defun colorlisp--predicate-satisfied-p (predicate captures source byte-map)
+(defun colorlisp--predicate-satisfied-p (predicate captures &key source byte-map)
   "Return true when PREDICATE accepts the current match."
   (let* ((name      (colorlisp--predicate-name (first predicate)))
          (arguments (rest predicate))
          (values    (mapcar (lambda (operand)
-                              (colorlisp--operand-values
-                               operand captures source byte-map))
+                              (colorlisp--operand-values operand captures
+                                                         :source   source
+                                                         :byte-map byte-map))
                             arguments)))
     (cond
       ((member name '("match?" "any-match?") :test #'string=)
@@ -242,16 +245,17 @@
               :detail (format nil "Unsupported query predicate ~A." name))))))
 
 
-(defun colorlisp--match-satisfied-p (session pattern captures source byte-map)
+(defun colorlisp--match-satisfied-p (session pattern captures &key source byte-map)
   "Return true when every predicate for PATTERN accepts CAPTURES."
   (every (lambda (predicate)
-           (colorlisp--predicate-satisfied-p
-            predicate captures source byte-map))
+           (colorlisp--predicate-satisfied-p predicate captures
+                                             :source   source
+                                             :byte-map byte-map))
          (colorlisp--split-predicates
           (colorlisp--predicate-steps session pattern))))
 
 
-(defun colorlisp--layer-captures (grammar query source source-octets byte-map)
+(defun colorlisp--layer-captures (grammar query &key source source-octets byte-map)
   "Return accepted raw captures for one GRAMMAR and QUERY layer."
   (let* ((query-source (colorlisp--query-source query))
          (query-octets (babel:string-to-octets query-source :encoding :utf-8))
@@ -265,8 +269,9 @@
               for captures = (colorlisp--current-match-captures
                               session pattern-value
                               (cffi:mem-ref capture-count :uint32))
-              when (colorlisp--match-satisfied-p
-                    session pattern-value captures source byte-map)
+              when (colorlisp--match-satisfied-p session pattern-value captures
+                                                 :source   source
+                                                 :byte-map byte-map)
                 do (setf result (nconc result captures)))))
     result))
 
@@ -394,8 +399,10 @@ Offsets are Common Lisp character offsets, not UTF-8 byte offsets."
              (byte-map      (colorlisp--utf-8-byte-map source))
              (captures
                (loop for (grammar query) in (language--layers resolved)
-                     append (colorlisp--layer-captures
-                             grammar query source source-octets byte-map))))
+                     append (colorlisp--layer-captures grammar query
+                                                       :source        source
+                                                       :source-octets source-octets
+                                                       :byte-map      byte-map))))
         (colorlisp--resolve-spans
          source
          (loop for capture in captures
