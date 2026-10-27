@@ -6,10 +6,12 @@
 (in-package #:colorlisp/tests)
 
 
-(defvar *failures* nil)
+(defvar *failures* nil
+  "The failed checks of the current test run, most recent first.")
 
 
 (defmacro check (form &optional description)
+  "Evaluate FORM and record DESCRIPTION, or FORM itself, as a failure when it returns false."
   `(unless ,form
      (push (or ,description ',form) *failures*)))
 
