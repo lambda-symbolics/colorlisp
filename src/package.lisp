@@ -1,4 +1,6 @@
 (defpackage #:colorlisp
+  (:documentation "Highlight source text with Tree-sitter grammars and return
+semantic spans or segments.")
   (:use #:cl)
   (:export
    #:colorlisp-error

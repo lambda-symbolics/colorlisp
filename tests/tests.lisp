@@ -1,4 +1,5 @@
 (defpackage #:colorlisp/tests
+  (:documentation "Tests for the colorlisp package.")
   (:use #:cl)
   (:export #:run-tests))
 
