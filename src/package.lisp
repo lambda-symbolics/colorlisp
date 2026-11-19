@@ -1,6 +1,6 @@
 (defpackage #:colorlisp
-  (:documentation "Highlight source text with Tree-sitter grammars and return
-semantic spans or segments.")
+  (:documentation "Highlight source text with Tree-sitter grammars, returning
+semantic spans and/or segments.")
   (:use #:cl)
   (:export
    #:colorlisp-error
