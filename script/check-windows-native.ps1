@@ -1,11 +1,20 @@
 # Run after script/bootstrap with an x64 SBCL and clang on PATH.
-param([string]$Sbcl = 'sbcl')
+# SetupPath selects an external locked environment for every probe subprocess.
+param([string]$Sbcl = 'sbcl', [string]$SetupPath)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $probe = Join-Path $PSScriptRoot 'probe-native.lisp'
 $temporary = Join-Path ([IO.Path]::GetTempPath()) ('colorlisp-native-' + [guid]::NewGuid().ToString('N'))
 $oldLibrary = $env:COLORLISP_NATIVE_LIBRARY
 $oldCache = $env:XDG_CACHE_HOME
+$oldSetup = $env:COLORLISP_TEST_SETUP
+if ($PSBoundParameters.ContainsKey('SetupPath')) {
+  if ([string]::IsNullOrWhiteSpace($SetupPath) -or
+      -not (Test-Path -LiteralPath $SetupPath -PathType Leaf)) {
+    throw 'SetupPath must name an existing setup file.'
+  }
+  $SetupPath = (Resolve-Path -LiteralPath $SetupPath).ProviderPath
+}
 $checks = 0
 
 function Assert-Native([bool]$Condition, [string]$Message) {
@@ -26,6 +35,7 @@ function Invoke-NativeProbe([string]$Action, [string]$Library = '') {
 }
 
 try {
+  if ($PSBoundParameters.ContainsKey('SetupPath')) { $env:COLORLISP_TEST_SETUP = $SetupPath }
   New-Item -ItemType Directory -Path $temporary | Out-Null
   $result = Invoke-NativeProbe select
   Assert-Native ($result.Status -eq 0) "Initial native selection failed: $($result.Output)"
@@ -77,6 +87,7 @@ try {
 } finally {
   $env:COLORLISP_NATIVE_LIBRARY = $oldLibrary
   $env:XDG_CACHE_HOME = $oldCache
+  $env:COLORLISP_TEST_SETUP = $oldSetup
   if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary -Recurse -Force }
 }
 

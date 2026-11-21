@@ -1,19 +1,29 @@
 (require :asdf)
 
-(let* ((root (uiop:pathname-parent-directory-pathname
-              (uiop:pathname-directory-pathname *load-truename*)))
-       (setup (merge-pathnames ".qlot/setup.lisp" root)))
-  (if (probe-file setup)
-      (load setup)
-      (let ((quicklisp (merge-pathnames "quicklisp/setup.lisp"
-                                        (user-homedir-pathname))))
-        (when (probe-file quicklisp) (load quicklisp))))
+(let* ((root      (uiop:pathname-parent-directory-pathname
+                   (uiop:pathname-directory-pathname *load-truename*)))
+       (setup     (merge-pathnames ".qlot/setup.lisp" root))
+       (requested (uiop:getenv "COLORLISP_TEST_SETUP")))
+  (cond
+    (requested
+     ;; An explicit fixture environment never falls back to another Quicklisp.
+     (unless (and (plusp (length requested))
+                  (uiop:absolute-pathname-p requested)
+                  (uiop:file-exists-p requested))
+       (error "COLORLISP_TEST_SETUP must name an existing absolute setup file."))
+     (load requested))
+    ((probe-file setup)
+     (load setup))
+    (t
+     (let ((quicklisp (merge-pathnames "quicklisp/setup.lisp"
+                                       (user-homedir-pathname))))
+       (when (probe-file quicklisp) (load quicklisp)))))
   (pushnew root asdf:*central-registry* :test #'equal)
   (asdf:load-asd (merge-pathnames "colorlisp.asd" root))
   (asdf:load-system "colorlisp"))
 
 (let* ((arguments (uiop:command-line-arguments))
-       (action (first arguments)))
+       (action    (first arguments)))
   (cond
     ((and (equal action "select") (= (length arguments) 1))
      (format t "~&~A~%" (uiop:native-namestring
