@@ -13,7 +13,7 @@
 This explicit Windows artifact check does not apply to normal library selection."
   (with-open-file (stream pathname :element-type '(unsigned-byte 8))
     (let ((dos (make-array 64 :element-type '(unsigned-byte 8)))
-          (pe (make-array 26 :element-type '(unsigned-byte 8))))
+          (pe  (make-array 26 :element-type '(unsigned-byte 8))))
       (unless (and (= (read-sequence dos stream) 64)
                    (= (colorlisp--unsigned dos 0) #x5a4d))
         (error 'highlight-error
@@ -37,7 +37,7 @@ This explicit Windows artifact check does not apply to normal library selection.
 When NUMBER-P is true, require a number capture over the literal 42."
   (flet ((symbol-pointer (name)
            "Return the already resolved pointer for NAME."
-           (cdr (assoc name symbols :test #'string=))))
+           (rest (assoc name symbols :test #'string=))))
     (cffi:with-foreign-string (source-pointer source :encoding :utf-8)
       (cffi:with-foreign-string (query-pointer query :encoding :utf-8)
         (cffi:with-foreign-objects ((error-offset :uint32) (error-type :uint32)
@@ -72,7 +72,7 @@ When NUMBER-P is true, require a number capture over the literal 42."
                                               (cffi:foreign-funcall-pointer
                                                   (symbol-pointer "colorlisp_session_capture_name") ()
                                                 :pointer session
-                                                :uint32 (cffi:mem-ref capture :uint32)
+                                                :uint32  (cffi:mem-ref capture :uint32)
                                                 :pointer name-length :pointer))
                                             (name (colorlisp--foreign-string
                                                    name-pointer
@@ -106,7 +106,7 @@ When NUMBER-P is true, require a number capture over the literal 42."
   (let ((handle
           (if (uiop:os-windows-p)
               (cffi:with-foreign-string (wide (uiop:native-namestring pathname)
-                                               :encoding :utf-16le)
+                                              :encoding :utf-16le)
                 (cffi:foreign-funcall-pointer
                     (colorlisp--loader-symbol "LoadLibraryW") ()
                   :pointer wide :pointer))
@@ -156,11 +156,13 @@ PE32+ DLL header before loading. Return the absolute tested pathname."
                          collect (cons name pointer))))
              (colorlisp--probe-session symbols :language "commonlisp" :source "("
                                       :query "(num_lit) @number")
-             (colorlisp--probe-session symbols :language "commonlisp"
-                                      :source "(defun answer () 42)"
-                                      :query "(num_lit) @number" :number-p t)
-             (colorlisp--probe-session symbols :language "rust"
-                                      :source "fn main() { 42 }"
-                                      :query "(integer_literal) @number" :number-p t)
+             (colorlisp--probe-session symbols
+                                      :language "commonlisp"
+                                      :source   "(defun answer () 42)"
+                                      :query    "(num_lit) @number" :number-p t)
+             (colorlisp--probe-session symbols
+                                      :language "rust"
+                                      :source   "fn main() { 42 }"
+                                      :query    "(integer_literal) @number" :number-p t)
              path)
         (colorlisp--probe-close library)))))

@@ -8,8 +8,10 @@
     (load (merge-pathnames file root))))
 
 (let* ((arguments (uiop:command-line-arguments))
-       (kind (cond ((equal (first arguments) "shared") :shared)
-                   ((equal (first arguments) "static") :static))))
+       (kind      (cond ((equal (first arguments) "shared")
+                         :shared)
+                        ((equal (first arguments) "static")
+                         :static))))
   (unless (and kind (<= 2 (length arguments) 5))
     (error "Usage: build-native.lisp shared|static OUTPUT [CC [AR [SHARED-FLAG]]]."))
   (apply #'uiop:symbol-call :colorlisp :native-build
