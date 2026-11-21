@@ -28,6 +28,45 @@ ColorLisp builds one private native library in the XDG cache on first use. A
 packager can ship =native/libcolorlisp-tree-sitter.so= beside the system, or
 set =COLORLISP_NATIVE_LIBRARY= to a packaged copy.
 
+Packagers can build a shared library or a static archive with SBCL, ASDF/UIOP,
+and a C toolchain, without loading ColorLisp dependencies:
+
+#+begin_src sh
+sbcl --noinform --disable-debugger --script script/build-native.lisp shared /build/colorlisp.so cc ar -shared
+sbcl --noinform --disable-debugger --script script/build-native.lisp static /build/colorlisp.a cc ar
+#+end_src
+
+Use =-dynamiclib= instead of =-shared= for a macOS shared library. On Windows,
+use =clang=; the builder omits =-fPIC=. Output filenames are unrestricted.
+The final three arguments are optional compiler, archiver and shared-link flag.
+The compiler defaults to =CC=, or =clang= on Windows and =cc= elsewhere.
+The archiver defaults to =AR= or =ar=.
+
+From Lisp, call =(colorlisp:native-build :output pathname :kind :shared)= or
+=:kind :static=. Supply =:compiler=, =:archiver=, =:compile-flags= and
+=:link-flags= to select a toolchain and its argument lists. Static archives
+contain a distinct object for every translation unit. A failed build preserves
+an existing output. =native-source-pathnames= and =native-include-pathnames=
+return the source and header-directory manifest as fresh pathname lists.
+
+=(colorlisp:native-probe pathname :windows-image-p t)= checks the x64 PE32+ DLL
+header, resolves every ColorLisp API symbol against that exact loaded handle,
+and checks incomplete Common Lisp input and Common Lisp/Rust number captures.
+A previously loaded library cannot supply missing symbols for this probe.
+Call =native-validate-windows-image= for only the header check. Both operations
+accept any filename; normal selection also accepts static-runtime executables.
+
+After bootstrap on Windows, run the malformed-image, unrelated-DLL,
+override-selection and exact-handle fixtures with either PowerShell:
+
+#+begin_src powershell
+powershell -NoProfile -File script/check-windows-native.ps1
+pwsh -NoProfile -File script/check-windows-native.ps1
+#+end_src
+
+Use =-Sbcl pathname= when SBCL is not on =PATH=. The unrelated DLL fixture is
+compiled with =clang= and has no dependency on an application library.
+
 #+begin_src sh
 ./script/bootstrap
 ./script/check

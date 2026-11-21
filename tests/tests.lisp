@@ -96,17 +96,81 @@ echo yes
          "native library pathname exists"))
 
 (defun test-native-include-arguments ()
-  "Test that native builds use the vendored Tree-sitter runtime headers."
-  (let ((expected
-          (format nil "-I~A"
-                  (namestring
-                   (merge-pathnames
-                    "vendor/tree-sitter/src/"
-                    (asdf:system-source-directory "colorlisp"))))))
-    (check (member expected
-                   (colorlisp::colorlisp--native-include-arguments)
-                   :test #'string=)
+  "Test the public source and header manifest against the vendored tree."
+  (let ((sources  (colorlisp:native-source-pathnames))
+        (includes (colorlisp:native-include-pathnames))
+        (expected (merge-pathnames "vendor/tree-sitter/src/"
+                                   (asdf:system-source-directory "colorlisp"))))
+    (check (every #'probe-file sources) "all native translation units exist")
+    (check (= (length sources) (length (remove-duplicates sources :test #'equal)))
+           "each native translation unit appears once")
+    (check (every #'probe-file includes) "all native header directories exist")
+    (check (member expected includes :test #'equal)
            "native build includes vendored Tree-sitter source headers")))
+
+(defun test-native-build-failure ()
+  "Test build failure reporting, cleanup and preservation of an existing output."
+  (let* ((root             (merge-pathnames
+                            (format nil "colorlisp-build-test-~D-~D/" (get-universal-time)
+                                    (random most-positive-fixnum))
+                            (uiop:temporary-directory)))
+         (target           (merge-pathnames "artifact" root))
+         (missing-compiler (namestring (merge-pathnames "missing-compiler" root))))
+    (ensure-directories-exist target)
+    (unwind-protect
+         (dolist (kind '(:shared :static))
+           (with-open-file (stream target :direction :output :if-exists :supersede)
+             (write-string "previous artifact" stream))
+           (check (handler-case
+                      (progn (colorlisp:native-build :output target :kind kind
+                                                   :compiler missing-compiler)
+                             nil)
+                    (colorlisp:native-build-error () t))
+                  "compiler failures signal native-build-error")
+           (check (string= "previous artifact" (uiop:read-file-string target))
+                  "failed builds preserve the previous output")
+           (check (null (uiop:subdirectories root))
+                  "failed builds remove their private object directory"))
+      (uiop:delete-directory-tree root :validate t :if-does-not-exist :ignore))))
+
+(defun test-native-artifact-probe ()
+  "Test exact-handle probes after loading a good library into global state."
+  (let* ((root      (merge-pathnames
+                     (format nil "colorlisp-probe-test-~D-~D/" (get-universal-time)
+                             (random most-positive-fixnum))
+                     (uiop:temporary-directory)))
+         (source    (merge-pathnames "unrelated.c" root))
+         (unrelated (merge-pathnames "unrelated.so" root))
+         (library   (colorlisp:native-library-path)))
+    (ensure-directories-exist source)
+    (unwind-protect
+         (progn
+           ;; Warm the normal memoized handle and SBCL's global symbol registry.
+           (colorlisp:highlight-spans "42" :language :common-lisp)
+           (check (probe-file (colorlisp:native-probe library))
+                  "exact native artifact passes both grammar probes")
+           (with-open-file (stream source :direction :output)
+             (write-line "int unrelated(void) { return 0; }" stream))
+           (uiop:run-program
+            (list (or (uiop:getenv "CC")
+                      (if (uiop:os-windows-p) "clang" "cc"))
+                  (if (uiop:os-macosx-p) "-dynamiclib" "-shared")
+                  "-o" (namestring unrelated) (namestring source))
+            :output *standard-output* :error-output *error-output*)
+           (check (handler-case
+                      (progn (colorlisp:native-probe unrelated) nil)
+                    (colorlisp:highlight-error () t))
+                  "a valid unrelated library cannot borrow the loaded ColorLisp API")
+           (check (handler-case
+                      (progn (colorlisp:native-probe
+                              (merge-pathnames "missing-library" root))
+                             nil)
+                    (colorlisp:highlight-error () t))
+                  "a missing explicit path cannot reuse the loaded library")
+           (check (find :number (colorlisp:highlight-spans "42" :language :common-lisp)
+                        :key    #'colorlisp:span-category)
+                  "probe cleanup does not release the normal loaded handle"))
+      (uiop:delete-directory-tree root :validate t :if-does-not-exist :ignore))))
 
 (defun test-supported-grammars ()
   "Smoke-test every bundled grammar and query."
@@ -252,6 +316,8 @@ letter = 'x'
   (setf *failures* nil)
   (test-native-library)
   (test-native-include-arguments)
+  (test-native-build-failure)
+  (test-native-artifact-probe)
   (test-language-registry)
   (test-supported-grammars)
   (test-new-language-semantics)

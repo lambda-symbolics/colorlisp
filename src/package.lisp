@@ -12,6 +12,11 @@ semantic spans or segments.")
    #:language-find
    #:language-name
    #:language-names
+   #:native-build
+   #:native-source-pathnames
+   #:native-include-pathnames
+   #:native-validate-windows-image
+   #:native-probe
    #:native-build-error
    #:native-library-path
    #:query-error

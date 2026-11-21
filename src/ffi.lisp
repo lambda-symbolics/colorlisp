@@ -1,5 +1,11 @@
 (in-package #:colorlisp)
 
+(defun native-ensure-loaded ()
+  "Build when needed and load the native Tree-sitter library."
+  (unless *native-library*
+    (setf *native-library* (cffi:load-foreign-library (native-library-path))))
+  *native-library*)
+
 (cffi:defcfun ("colorlisp_session_new" colorlisp--session-new) :pointer
   (language-name :string)
   (source :pointer)

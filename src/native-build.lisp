@@ -119,38 +119,74 @@
        "vendor/grammars/ruby/"
        "vendor/grammars/lua/"))))
 
+(defun native-source-pathnames ()
+  "Return a fresh list of absolute C translation unit pathnames."
+  (mapcar #'pathname (colorlisp--native-source-pathnames)))
+
+(defun native-include-pathnames ()
+  "Return a fresh list of absolute native header directory pathnames."
+  (mapcar (lambda (argument) (pathname (subseq argument 2)))
+          (colorlisp--native-include-arguments)))
+
+(defun native-build (&key output (kind :shared)
+                          (compiler (or (uiop:getenv "CC")
+                                        (if (uiop:os-windows-p) "clang" "cc")))
+                          (archiver (or (uiop:getenv "AR") "ar"))
+                          (compile-flags '("-O2" "-std=gnu11"
+                                           "-fvisibility=hidden"))
+                          (link-flags (list (if (uiop:os-macosx-p)
+                                               "-dynamiclib" "-shared"))))
+  "Build KIND (:SHARED or :STATIC) atomically at OUTPUT and return its pathname.
+COMPILER and ARCHIVER are executable names. COMPILE-FLAGS and LINK-FLAGS are
+argument lists, not shell strings. A static build uses one object per source."
+  (check-type output (or string pathname))
+  (check-type kind (member :shared :static))
+  (let* ((target    (merge-pathnames output (uiop:getcwd)))
+         (directory (uiop:pathname-directory-pathname target))
+         (work      (merge-pathnames
+                     (format nil ".colorlisp-~D-~D/" (get-universal-time)
+                             (random most-positive-fixnum))
+                     directory))
+         (temporary (merge-pathnames (file-namestring target) work))
+         (command   nil))
+    (ensure-directories-exist temporary)
+    (labels ((run (arguments)
+               "Run ARGUMENTS while retaining the failing command."
+               (setf command arguments)
+               (uiop:run-program arguments :output      *standard-output*
+                                          :error-output *error-output*)))
+      (unwind-protect
+           (handler-case
+               (progn
+                 (ecase kind
+                   (:shared
+                    (run (append (list compiler) link-flags
+                                 (unless (uiop:os-windows-p) '("-fPIC"))
+                                 compile-flags (colorlisp--native-include-arguments)
+                                 (list "-o" (namestring temporary))
+                                 (colorlisp--native-source-pathnames))))
+                   (:static
+                    (let ((objects
+                            (loop for source in (native-source-pathnames)
+                                  for index from 0
+                                  for object = (merge-pathnames
+                                                (format nil "source-~D.o" index) work)
+                                  do (run (append (list compiler "-c") compile-flags
+                                                  (colorlisp--native-include-arguments)
+                                                  (list "-o" (namestring object)
+                                                        (namestring source))))
+                                  collect (namestring object))))
+                      (run (append (list archiver "rcs" (namestring temporary))
+                                   objects)))))
+                 (uiop:rename-file-overwriting-target temporary target)
+                 target)
+             (error (condition)
+               (error 'native-build-error :command command :cause condition)))
+        (uiop:delete-directory-tree work :validate t :if-does-not-exist :ignore)))))
+
 (defun colorlisp--build-native-library (target)
-  "Build the native library and atomically publish it at TARGET."
-  (ensure-directories-exist target)
-  (let* ((temporary
-           (merge-pathnames
-            (format nil ".libcolorlisp-tree-sitter-~D-~D.so"
-                    (get-universal-time)
-                    (random most-positive-fixnum))
-            (uiop:pathname-directory-pathname target)))
-         ;; Windows toolchains reject -fPIC, and ship no cc, so clang is
-         ;; the default compiler there.
-         (command
-           (append (list (or (uiop:getenv "CC")
-                             (if (uiop:os-windows-p) "clang" "cc"))
-                         "-shared")
-                   (unless (uiop:os-windows-p)
-                     (list "-fPIC"))
-                   (list "-O2" "-std=gnu11"
-                         "-fvisibility=hidden"
-                         "-o" (namestring temporary))
-                   (colorlisp--native-include-arguments)
-                   (colorlisp--native-source-pathnames))))
-    (handler-case
-        (progn
-          (uiop:run-program command
-                            :output       *standard-output*
-                            :error-output *error-output*)
-          (uiop:rename-file-overwriting-target temporary target))
-      (error (condition)
-        (when (probe-file temporary)
-          (delete-file temporary))
-        (error 'native-build-error :command command :cause condition)))))
+  "Build the shared native library at TARGET."
+  (native-build :output target))
 
 (defun colorlisp--native-library-path ()
   "Return an existing native library, building one when necessary."
@@ -175,10 +211,3 @@
 (defun native-library-path ()
   "Build when needed and return ColorLisp's native library pathname."
   (colorlisp--native-library-path))
-
-(defun native-ensure-loaded ()
-  "Build when needed and load ColorLisp's native Tree-sitter library."
-  (unless *native-library*
-    (setf *native-library*
-          (cffi:load-foreign-library (native-library-path))))
-  *native-library*)

@@ -12,7 +12,8 @@
                 (:file "src/native-build")
                 (:file "src/ffi")
                 (:file "src/languages")
-                (:file "src/highlight"))
+                (:file "src/highlight")
+                (:file "src/native-validation"))
   :in-order-to ((test-op (test-op "colorlisp/tests"))))
 
 (asdf:defsystem "colorlisp/tests"
