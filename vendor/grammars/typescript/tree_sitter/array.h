@@ -59,8 +59,9 @@ extern "C" {
 #define array_delete(self) _array__delete((Array *)(self))
 
 /// Push a new `element` onto the end of the array.
-#define array_push(self, element)                            \
-  (_array__grow((Array *)(self), 1, array_elem_size(self)), \
+#define array_push(self, element)                                      \
+  ((self)->contents = _array__grow((Array *)(self), 1,                 \
+                                   array_elem_size(self)),             \
    (self)->contents[(self)->size++] = (element))
 
 /// Increase the array's size by `count` elements.
@@ -68,7 +69,7 @@ extern "C" {
 #define array_grow_by(self, count) \
   do { \
     if ((count) == 0) break; \
-    _array__grow((Array *)(self), count, array_elem_size(self)); \
+    (self)->contents = _array__grow((Array *)(self), count, array_elem_size(self)); \
     memset((self)->contents + (self)->size, 0, (count) * array_elem_size(self)); \
     (self)->size += (count); \
   } while (0)
@@ -205,7 +206,7 @@ static inline void _array__swap(Array *self, Array *other) {
 }
 
 /// This is not what you're looking for, see `array_push` or `array_grow_by`.
-static inline void _array__grow(Array *self, uint32_t count, size_t element_size) {
+static inline void *_array__grow(Array *self, uint32_t count, size_t element_size) {
   uint32_t new_size = self->size + count;
   if (new_size > self->capacity) {
     uint32_t new_capacity = self->capacity * 2;
@@ -213,6 +214,7 @@ static inline void _array__grow(Array *self, uint32_t count, size_t element_size
     if (new_capacity < new_size) new_capacity = new_size;
     _array__reserve(self, element_size, new_capacity);
   }
+  return self->contents;
 }
 
 /// This is not what you're looking for, see `array_splice`.
